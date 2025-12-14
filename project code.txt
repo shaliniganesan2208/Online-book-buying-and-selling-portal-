@@ -1,0 +1,929 @@
+// OnlineBookPortal.java
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.*;
+import java.util.List;
+
+public class OnlineBookPortal {
+    private JFrame mainFrame;
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+    private User currentUser;
+    private BookDatabase bookDB;
+    private Map<String, List<Book>> userCart;
+
+    public OnlineBookPortal() {
+        bookDB = new BookDatabase();
+        userCart = new HashMap<>();
+        initializeGUI();
+    }
+
+    // User class
+    class User {
+        private String username;
+        private String password;
+        private String userType;
+
+        public User(String username, String password, String userType) {
+            this.username = username;
+            this.password = password;
+            this.userType = userType;
+        }
+
+        public String getUsername() { return username; }
+        public String getPassword() { return password; }
+        public String getUserType() { return userType; }
+    }
+
+    // Review class
+    class Review {
+        private String username;
+        private int rating;
+        private String comment;
+        private String date;
+
+        public Review(String username, int rating, String comment) {
+            this.username = username;
+            this.rating = rating;
+            this.comment = comment;
+            this.date = java.time.LocalDate.now().toString();
+        }
+
+        public String getUsername() { return username; }
+        public int getRating() { return rating; }
+        public String getComment() { return comment; }
+        public String getDate() { return date; }
+
+        @Override
+        public String toString() {
+            return String.format("%s - %d/5 Stars\n%s\nDate: %s", username, rating, comment, date);
+        }
+    }
+
+    // Book class
+    class Book {
+        private String title;
+        private String author;
+        private String genre;
+        private double price;
+        private String isbn;
+        private List<Review> reviews;
+        private int stock;
+        private String description;
+
+        public Book(String title, String author, String genre, double price, String isbn) {
+            this.title = title;
+            this.author = author;
+            this.genre = genre;
+            this.price = price;
+            this.isbn = isbn;
+            this.reviews = new ArrayList<>();
+            this.stock = (int) (Math.random() * 50) + 10;
+            this.description = "A wonderful book about " + genre.toLowerCase() + " written by " + author + ".";
+        }
+
+        public String getTitle() { return title; }
+        public String getAuthor() { return author; }
+        public String getGenre() { return genre; }
+        public double getPrice() { return price; }
+        public String getIsbn() { return isbn; }
+        public List<Review> getReviews() { return reviews; }
+        public int getStock() { return stock; }
+        public String getDescription() { return description; }
+        public void setStock(int stock) { this.stock = stock; }
+
+        public void addReview(Review review) {
+            reviews.add(review);
+        }
+
+        public double getAverageRating() {
+            if (reviews.isEmpty()) return 0;
+            return reviews.stream().mapToInt(Review::getRating).average().orElse(0);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s by %s - $%.2f ⭐%.1f", title, author, price, getAverageRating());
+        }
+
+        public String getDetailedInfo() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("📚 ").append(title).append("\n\n");
+            sb.append("✍ Author: ").append(author).append("\n");
+            sb.append("📖 Genre: ").append(genre).append("\n");
+            sb.append("💰 Price: $").append(String.format("%.2f", price)).append("\n");
+            sb.append("🔢 ISBN: ").append(isbn).append("\n");
+            sb.append("📦 Stock: ").append(stock).append(" units\n");
+            sb.append("⭐ Average Rating: ").append(String.format("%.1f/5", getAverageRating())).append("\n\n");
+            sb.append("📝 Description:\n").append(description).append("\n\n");
+            sb.append("📋 Reviews:\n");
+
+            if (reviews.isEmpty()) {
+                sb.append("   No reviews yet. Be the first to review!\n");
+            } else {
+                for (Review review : reviews) {
+                    sb.append("   ").append(review).append("\n\n");
+                }
+            }
+            return sb.toString();
+        }
+    }
+
+    // UserManager class
+    class UserManager {
+        private Map<String, User> users;
+
+        public UserManager() {
+            users = new HashMap<>();
+            // Sample users
+            users.put("buyer1", new User("buyer1", "password", "Buyer"));
+            users.put("seller1", new User("seller1", "password", "Seller"));
+            users.put("admin", new User("admin", "admin", "Buyer"));
+        }
+
+        public User authenticate(String username, String password, String userType) {
+            User user = users.get(username);
+            if (user != null && user.getPassword().equals(password) && user.getUserType().equals(userType)) {
+                return user;
+            }
+            return null;
+        }
+
+        public void registerUser(String username, String password, String userType) {
+            users.put(username, new User(username, password, userType));
+        }
+
+        public boolean userExists(String username) {
+            return users.containsKey(username);
+        }
+    }
+
+    // BookDatabase class
+    class BookDatabase {
+        private List<Book> books;
+
+        public BookDatabase() {
+            books = new ArrayList<>();
+            initializeSampleBooks();
+        }
+
+        private void initializeSampleBooks() {
+            // Expanded book list with 100+ books
+            String[][] sampleBooks = {
+                    // Fiction
+                    {"The Great Gatsby", "F. Scott Fitzgerald", "Fiction", "12.99", "9780743273565"},
+                    {"To Kill a Mockingbird", "Harper Lee", "Fiction", "11.99", "9780061120084"},
+                    {"1984", "George Orwell", "Fiction", "10.99", "9780451524935"},
+                    {"Pride and Prejudice", "Jane Austen", "Fiction", "9.99", "9780141439518"},
+                    {"The Catcher in the Rye", "J.D. Salinger", "Fiction", "10.99", "9780316769174"},
+                    {"Lord of the Flies", "William Golding", "Fiction", "9.99", "9780571056866"},
+                    {"The Alchemist", "Paulo Coelho", "Fiction", "11.99", "9780061122415"},
+                    {"Brave New World", "Aldous Huxley", "Fiction", "12.99", "9780060850524"},
+                    {"The Kite Runner", "Khaled Hosseini", "Fiction", "13.99", "9781594631931"},
+                    {"The Book Thief", "Markus Zusak", "Fiction", "14.99", "9780375831003"},
+
+                    // Fantasy
+                    {"The Hobbit", "J.R.R. Tolkien", "Fantasy", "14.99", "9780547928227"},
+                    {"Harry Potter and the Sorcerer's Stone", "J.K. Rowling", "Fantasy", "15.99", "9780590353427"},
+                    {"The Chronicles of Narnia", "C.S. Lewis", "Fantasy", "16.99", "9780066238500"},
+                    {"The Name of the Wind", "Patrick Rothfuss", "Fantasy", "13.99", "9780756404741"},
+                    {"A Game of Thrones", "George R.R. Martin", "Fantasy", "17.99", "9780553103540"},
+                    {"The Way of Kings", "Brandon Sanderson", "Fantasy", "18.99", "9780765326355"},
+                    {"Mistborn: The Final Empire", "Brandon Sanderson", "Fantasy", "14.99", "9780765311788"},
+                    {"The Lightning Thief", "Rick Riordan", "Fantasy", "12.99", "9780786856299"},
+                    {"Eragon", "Christopher Paolini", "Fantasy", "13.99", "9780375826689"},
+                    {"The Eye of the World", "Robert Jordan", "Fantasy", "16.99", "9780812511819"},
+
+                    // Science Fiction
+                    {"Dune", "Frank Herbert", "Science Fiction", "15.99", "9780441172719"},
+                    {"Foundation", "Isaac Asimov", "Science Fiction", "12.99", "9780553293357"},
+                    {"Ender's Game", "Orson Scott Card", "Science Fiction", "11.99", "9780812550702"},
+                    {"The Martian", "Andy Weir", "Science Fiction", "13.99", "9780553418026"},
+                    {"Neuromancer", "William Gibson", "Science Fiction", "14.99", "9780441569595"},
+                    {"Snow Crash", "Neal Stephenson", "Science Fiction", "13.99", "9780553380958"},
+                    {"The Left Hand of Darkness", "Ursula K. Le Guin", "Science Fiction", "12.99", "9780441478125"},
+                    {"Hyperion", "Dan Simmons", "Science Fiction", "16.99", "9780553283686"},
+                    {"Ready Player One", "Ernest Cline", "Science Fiction", "14.99", "9780307887436"},
+                    {"The Three-Body Problem", "Liu Cixin", "Science Fiction", "15.99", "9780765377067"},
+
+                    // Additional books to reach 100+
+                    {"The Sun Also Rises", "Ernest Hemingway", "Fiction", "11.99", "9780743297332"},
+                    {"Moby Dick", "Herman Melville", "Fiction", "10.99", "9780142437247"},
+                    {"War and Peace", "Leo Tolstoy", "Fiction", "19.99", "9780143039990"},
+                    {"Crime and Punishment", "Fyodor Dostoevsky", "Fiction", "12.99", "9780143058144"},
+                    {"The Brothers Karamazov", "Fyodor Dostoevsky", "Fiction", "18.99", "9780374528379"},
+                    {"One Hundred Years of Solitude", "Gabriel Garcia Marquez", "Fiction", "14.99", "9780060883287"},
+                    {"Love in the Time of Cholera", "Gabriel Garcia Marquez", "Fiction", "13.99", "9780307389732"},
+                    {"The Stranger", "Albert Camus", "Fiction", "9.99", "9780679720201"},
+                    {"The Plague", "Albert Camus", "Fiction", "11.99", "9780679720218"},
+                    {"No Longer Human", "Osamu Dazai", "Fiction", "10.99", "9780811204811"}
+            };
+
+            Random random = new Random();
+            for (String[] bookData : sampleBooks) {
+                Book book = new Book(bookData[0], bookData[1], bookData[2],
+                        Double.parseDouble(bookData[3]), bookData[4]);
+
+                // Add random reviews
+                int reviewCount = random.nextInt(5) + 1;
+                for (int i = 0; i < reviewCount; i++) {
+                    String[] sampleUsers = {"BookLover", "Reader123", "LiteraryFan", "PageTurner", "NovelEnthusiast"};
+                    String[] sampleComments = {
+                            "Absolutely loved this book! Couldn't put it down.",
+                            "Great read, highly recommended!",
+                            "Interesting storyline and well-developed characters.",
+                            "One of the best books I've read this year.",
+                            "The author's writing style is captivating.",
+                            "A must-read for everyone!",
+                            "Couldn't stop thinking about it after finishing.",
+                            "Beautiful prose and compelling narrative.",
+                            "Worth every penny!",
+                            "Already recommended to all my friends!"
+                    };
+
+                    String user = sampleUsers[random.nextInt(sampleUsers.length)];
+                    int rating = random.nextInt(2) + 4; // 4-5 stars
+                    String comment = sampleComments[random.nextInt(sampleComments.length)];
+
+                    book.addReview(new Review(user, rating, comment));
+                }
+
+                books.add(book);
+            }
+        }
+
+        public List<Book> getAllBooks() {
+            return books;
+        }
+
+        public void addBook(Book book) {
+            books.add(book);
+        }
+
+        public List<Book> searchBooks(String query, String filter) {
+            List<Book> results = new ArrayList<>();
+            for (Book book : books) {
+                boolean match = false;
+                switch (filter.toLowerCase()) {
+                    case "title":
+                        match = book.getTitle().toLowerCase().contains(query.toLowerCase());
+                        break;
+                    case "author":
+                        match = book.getAuthor().toLowerCase().contains(query.toLowerCase());
+                        break;
+                    case "genre":
+                        match = book.getGenre().toLowerCase().contains(query.toLowerCase());
+                        break;
+                    default:
+                        match = book.getTitle().toLowerCase().contains(query.toLowerCase()) ||
+                                book.getAuthor().toLowerCase().contains(query.toLowerCase()) ||
+                                book.getGenre().toLowerCase().contains(query.toLowerCase());
+                }
+                if (match) {
+                    results.add(book);
+                }
+            }
+            return results;
+        }
+    }
+
+    private UserManager userManager = new UserManager();
+
+    private void initializeGUI() {
+        mainFrame = new JFrame("📚 Online Book Portal");
+        mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        mainFrame.setSize(1200, 800);
+        mainFrame.setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+
+        // Create different screens
+        mainPanel.add(createLoginPanel(), "LOGIN");
+        mainPanel.add(createBuyerDashboard(), "BUYER_DASHBOARD");
+        mainPanel.add(createSellerDashboard(), "SELLER_DASHBOARD");
+        mainPanel.add(createBookSearchPanel(), "BOOK_SEARCH");
+        mainPanel.add(createCartPanel(), "CART");
+        mainPanel.add(createOrdersPanel(), "ORDERS");
+
+        mainFrame.add(mainPanel);
+        cardLayout.show(mainPanel, "LOGIN");
+        mainFrame.setVisible(true);
+    }
+
+    private JPanel createLoginPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(new Color(240, 245, 255));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(15, 15, 15, 15);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        // Title
+        JLabel titleLabel = new JLabel("📚 Online Book Portal", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 28));
+        titleLabel.setForeground(new Color(0, 51, 102));
+
+        // Subtitle
+        JLabel subtitleLabel = new JLabel("Your one-stop destination for books", JLabel.CENTER);
+        subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        subtitleLabel.setForeground(new Color(102, 102, 102));
+
+        // Form components
+        JLabel userTypeLabel = new JLabel("Login As:");
+        userTypeLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        JComboBox<String> userTypeCombo = new JComboBox<>(new String[]{"Buyer", "Seller"});
+        userTypeCombo.setFont(new Font("Arial", Font.PLAIN, 14));
+
+        JLabel usernameLabel = new JLabel("Username:");
+        usernameLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        JTextField usernameField = new JTextField(20);
+        usernameField.setFont(new Font("Arial", Font.PLAIN, 14));
+
+        JLabel passwordLabel = new JLabel("Password:");
+        passwordLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        JPasswordField passwordField = new JPasswordField(20);
+        passwordField.setFont(new Font("Arial", Font.PLAIN, 14));
+
+        JButton loginButton = new JButton("🔑 Login");
+        loginButton.setFont(new Font("Arial", Font.BOLD, 14));
+        loginButton.setBackground(new Color(70, 130, 180));
+        loginButton.setForeground(Color.BLACK);
+
+        JButton registerButton = new JButton("📝 Register");
+        registerButton.setFont(new Font("Arial", Font.BOLD, 14));
+        registerButton.setBackground(new Color(34, 139, 34));
+        registerButton.setForeground(Color.BLACK);
+
+        JButton guestButton = new JButton("👤 Continue as Guest");
+        guestButton.setFont(new Font("Arial", Font.PLAIN, 12));
+        guestButton.setForeground(new Color(70, 130, 180));
+
+        // Layout
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
+        panel.add(titleLabel, gbc);
+
+        gbc.gridy = 1;
+        panel.add(subtitleLabel, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.gridy = 2; gbc.gridx = 0; panel.add(userTypeLabel, gbc);
+        gbc.gridx = 1; panel.add(userTypeCombo, gbc);
+
+        gbc.gridy = 3; gbc.gridx = 0; panel.add(usernameLabel, gbc);
+        gbc.gridx = 1; panel.add(usernameField, gbc);
+
+        gbc.gridy = 4; gbc.gridx = 0; panel.add(passwordLabel, gbc);
+        gbc.gridx = 1; panel.add(passwordField, gbc);
+
+        gbc.gridy = 5; gbc.gridx = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        panel.add(loginButton, gbc);
+
+        gbc.gridx = 1;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(registerButton, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 6; gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        panel.add(guestButton, gbc);
+
+        // Login button action
+        loginButton.addActionListener(e -> {
+            String username = usernameField.getText();
+            String password = new String(passwordField.getPassword());
+            String userType = (String) userTypeCombo.getSelectedItem();
+
+            if (username.isEmpty() || password.isEmpty()) {
+                JOptionPane.showMessageDialog(mainFrame, "Please fill in all fields!");
+                return;
+            }
+
+            if (authenticateUser(username, password, userType)) {
+                JOptionPane.showMessageDialog(mainFrame, "Login Successful! Welcome " + username);
+                if ("Buyer".equals(userType)) {
+                    cardLayout.show(mainPanel, "BUYER_DASHBOARD");
+                } else {
+                    cardLayout.show(mainPanel, "SELLER_DASHBOARD");
+                }
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Invalid credentials! Please try again.");
+            }
+        });
+
+        registerButton.addActionListener(e -> {
+            String username = JOptionPane.showInputDialog(mainFrame, "Enter username:");
+            if (username == null || username.trim().isEmpty()) return;
+
+            if (userManager.userExists(username)) {
+                JOptionPane.showMessageDialog(mainFrame, "Username already exists!");
+                return;
+            }
+
+            String password = JOptionPane.showInputDialog(mainFrame, "Enter password:");
+            if (password == null || password.trim().isEmpty()) return;
+
+            String userType = (String) userTypeCombo.getSelectedItem();
+            userManager.registerUser(username, password, userType);
+            JOptionPane.showMessageDialog(mainFrame, "Registration Successful! You can now login.");
+            usernameField.setText(username);
+            passwordField.setText("");
+        });
+
+        guestButton.addActionListener(e -> {
+            currentUser = new User("guest", "", "Buyer");
+            cardLayout.show(mainPanel, "BUYER_DASHBOARD");
+        });
+
+        return panel;
+    }
+
+    private boolean authenticateUser(String username, String password, String userType) {
+        currentUser = userManager.authenticate(username, password, userType);
+        return currentUser != null;
+    }
+
+    private JPanel createBuyerDashboard() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+
+        // Header
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(new Color(70, 130, 180));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        // FIX: Added null check for currentUser
+        String username = (currentUser != null) ? currentUser.getUsername() : "Guest";
+        JLabel titleLabel = new JLabel("👤 Buyer Dashboard - Welcome " + username);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(Color.BLACK);
+
+        JButton logoutBtn = new JButton("🚪 Logout");
+        logoutBtn.setBackground(Color.RED);
+        logoutBtn.setForeground(Color.BLACK);
+
+        headerPanel.add(titleLabel, BorderLayout.WEST);
+        headerPanel.add(logoutBtn, BorderLayout.EAST);
+
+        // Main content
+        JPanel contentPanel = new JPanel(new GridLayout(2, 2, 20, 20));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+        contentPanel.setBackground(Color.WHITE);
+
+        // Feature buttons
+        JButton searchBooksBtn = createFeatureButton("🔍 Search Books", "Browse our collection of 100+ books", new Color(70, 130, 180));
+        JButton viewCartBtn = createFeatureButton("🛒 View Cart", "Check your shopping cart", new Color(34, 139, 34));
+        JButton myOrdersBtn = createFeatureButton("📦 My Orders", "View your order history", new Color(255, 140, 0));
+        JButton wishlistBtn = createFeatureButton("❤ Wishlist", "Save books for later", new Color(220, 20, 60));
+
+        contentPanel.add(searchBooksBtn);
+        contentPanel.add(viewCartBtn);
+        contentPanel.add(myOrdersBtn);
+        contentPanel.add(wishlistBtn);
+
+        panel.add(headerPanel, BorderLayout.NORTH);
+        panel.add(contentPanel, BorderLayout.CENTER);
+
+        // Button actions
+        searchBooksBtn.addActionListener(e -> cardLayout.show(mainPanel, "BOOK_SEARCH"));
+        viewCartBtn.addActionListener(e -> cardLayout.show(mainPanel, "CART"));
+        myOrdersBtn.addActionListener(e -> cardLayout.show(mainPanel, "ORDERS"));
+        wishlistBtn.addActionListener(e -> JOptionPane.showMessageDialog(mainFrame, "Wishlist feature coming soon!"));
+        logoutBtn.addActionListener(e -> {
+            currentUser = null;
+            cardLayout.show(mainPanel, "LOGIN");
+        });
+
+        return panel;
+    }
+
+    private JButton createFeatureButton(String text, String tooltip, Color color) {
+        JButton button = new JButton("<html><center>" + text.replace(" ", "<br>") + "</center></html>");
+        button.setFont(new Font("Arial", Font.BOLD, 16));
+        button.setBackground(color);
+        button.setForeground(Color.BLACK);
+        button.setToolTipText(tooltip);
+        button.setPreferredSize(new Dimension(200, 100));
+        return button;
+    }
+
+    private JPanel createSellerDashboard() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+
+        // FIX: Added null check for currentUser
+        String username = (currentUser != null) ? currentUser.getUsername() : "Seller";
+        JLabel titleLabel = new JLabel("👨‍💼 Seller Dashboard - Welcome " + username, JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(0, 51, 102));
+
+        JButton addBookBtn = new JButton("➕ Add New Book");
+        JButton viewInventoryBtn = new JButton("📊 View Inventory");
+        JButton salesReportBtn = new JButton("📈 Sales Report");
+        JButton logoutBtn = new JButton("🚪 Logout");
+
+        addBookBtn.setFont(new Font("Arial", Font.BOLD, 14));
+        viewInventoryBtn.setFont(new Font("Arial", Font.BOLD, 14));
+        salesReportBtn.setFont(new Font("Arial", Font.BOLD, 14));
+        logoutBtn.setFont(new Font("Arial", Font.BOLD, 14));
+
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 2, 20, 20));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(100, 100, 100, 100));
+        buttonPanel.add(addBookBtn);
+        buttonPanel.add(viewInventoryBtn);
+        buttonPanel.add(salesReportBtn);
+        buttonPanel.add(logoutBtn);
+
+        panel.add(titleLabel, BorderLayout.NORTH);
+        panel.add(buttonPanel, BorderLayout.CENTER);
+
+        addBookBtn.addActionListener(e -> showAddBookDialog());
+        viewInventoryBtn.addActionListener(e -> showInventory());
+        salesReportBtn.addActionListener(e -> JOptionPane.showMessageDialog(mainFrame, "Sales report feature coming soon!"));
+        logoutBtn.addActionListener(e -> {
+            currentUser = null;
+            cardLayout.show(mainPanel, "LOGIN");
+        });
+
+        return panel;
+    }
+
+    private JPanel createBookSearchPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        // Header
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(new Color(70, 130, 180));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JButton backBtn = new JButton("⬅ Back");
+        JLabel titleLabel = new JLabel("🔍 Search Books", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        titleLabel.setForeground(Color.BLACK);
+
+        headerPanel.add(backBtn, BorderLayout.WEST);
+        headerPanel.add(titleLabel, BorderLayout.CENTER);
+
+        // Search panel
+        JPanel searchPanel = new JPanel();
+        searchPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JTextField searchField = new JTextField(25);
+        JButton searchButton = new JButton("🔍 Search");
+        JComboBox<String> filterCombo = new JComboBox<>(new String[]{"All", "Title", "Author", "Genre"});
+        JButton viewAllBtn = new JButton("📚 View All Books");
+
+        searchPanel.add(new JLabel("Search:"));
+        searchPanel.add(searchField);
+        searchPanel.add(new JLabel("Filter by:"));
+        searchPanel.add(filterCombo);
+        searchPanel.add(searchButton);
+        searchPanel.add(viewAllBtn);
+
+        // Books display
+        DefaultListModel<String> bookListModel = new DefaultListModel<>();
+        JList<String> bookList = new JList<>(bookListModel);
+        bookList.setFont(new Font("Arial", Font.PLAIN, 14));
+        JScrollPane scrollPane = new JScrollPane(bookList);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Books (" + bookDB.getAllBooks().size() + " available)"));
+
+        // Buttons panel
+        JPanel buttonPanel = new JPanel();
+        JButton viewDetailsBtn = new JButton("📖 View Details");
+        JButton addToCartBtn = new JButton("🛒 Add to Cart");
+        JButton buyNowBtn = new JButton("💰 Buy Now");
+        JButton cartBtn = new JButton("🛒 View Cart");
+
+        buttonPanel.add(viewDetailsBtn);
+        buttonPanel.add(addToCartBtn);
+        buttonPanel.add(buyNowBtn);
+        buttonPanel.add(cartBtn);
+
+        panel.add(headerPanel, BorderLayout.NORTH);
+        panel.add(searchPanel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        // Load sample books
+        loadSampleBooks(bookListModel);
+
+        searchButton.addActionListener(e -> performSearch(searchField, filterCombo, bookListModel));
+        viewAllBtn.addActionListener(e -> loadSampleBooks(bookListModel));
+        backBtn.addActionListener(e -> cardLayout.show(mainPanel, "BUYER_DASHBOARD"));
+
+        viewDetailsBtn.addActionListener(e -> {
+            int selectedIndex = bookList.getSelectedIndex();
+            if (selectedIndex != -1) {
+                showBookDetails(selectedIndex);
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Please select a book first!");
+            }
+        });
+
+        addToCartBtn.addActionListener(e -> {
+            int selectedIndex = bookList.getSelectedIndex();
+            if (selectedIndex != -1) {
+                addToCart(selectedIndex);
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Please select a book first!");
+            }
+        });
+
+        buyNowBtn.addActionListener(e -> {
+            int selectedIndex = bookList.getSelectedIndex();
+            if (selectedIndex != -1) {
+                buyNow(selectedIndex);
+            } else {
+                JOptionPane.showMessageDialog(mainFrame, "Please select a book first!");
+            }
+        });
+
+        cartBtn.addActionListener(e -> cardLayout.show(mainPanel, "CART"));
+
+        return panel;
+    }
+
+    private void performSearch(JTextField searchField, JComboBox<String> filterCombo, DefaultListModel<String> bookListModel) {
+        String query = searchField.getText().toLowerCase();
+        String filter = (String) filterCombo.getSelectedItem();
+        bookListModel.clear();
+
+        for (Book book : bookDB.getAllBooks()) {
+            boolean match = false;
+            switch (filter) {
+                case "Title": match = book.getTitle().toLowerCase().contains(query); break;
+                case "Author": match = book.getAuthor().toLowerCase().contains(query); break;
+                case "Genre": match = book.getGenre().toLowerCase().contains(query); break;
+                default:
+                    match = book.getTitle().toLowerCase().contains(query) ||
+                            book.getAuthor().toLowerCase().contains(query) ||
+                            book.getGenre().toLowerCase().contains(query);
+            }
+            if (match || query.isEmpty()) {
+                bookListModel.addElement(book.toString());
+            }
+        }
+    }
+
+    private JPanel createCartPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JLabel titleLabel = new JLabel("🛒 Shopping Cart", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+
+        DefaultListModel<String> cartModel = new DefaultListModel<>();
+        JList<String> cartList = new JList<>(cartModel);
+        JScrollPane scrollPane = new JScrollPane(cartList);
+
+        JPanel buttonPanel = new JPanel();
+        JButton backBtn = new JButton("⬅ Back to Search");
+        JButton removeBtn = new JButton("❌ Remove Item");
+        JButton checkoutBtn = new JButton("✅ Checkout");
+        JButton clearBtn = new JButton("🗑 Clear Cart");
+
+        buttonPanel.add(backBtn);
+        buttonPanel.add(removeBtn);
+        buttonPanel.add(checkoutBtn);
+        buttonPanel.add(clearBtn);
+
+        panel.add(titleLabel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        // Load cart items
+        updateCartDisplay(cartModel);
+
+        backBtn.addActionListener(e -> cardLayout.show(mainPanel, "BOOK_SEARCH"));
+        removeBtn.addActionListener(e -> removeFromCart(cartList, cartModel));
+        checkoutBtn.addActionListener(e -> checkout(cartModel));
+        clearBtn.addActionListener(e -> clearCart(cartModel));
+
+        return panel;
+    }
+
+    private JPanel createOrdersPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(new JLabel("📦 Order History - Under Construction", JLabel.CENTER), BorderLayout.CENTER);
+
+        JButton backBtn = new JButton("⬅ Back to Dashboard");
+        backBtn.addActionListener(e -> cardLayout.show(mainPanel, "BUYER_DASHBOARD"));
+        panel.add(backBtn, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void loadSampleBooks(DefaultListModel<String> bookListModel) {
+        bookListModel.clear();
+        for (Book book : bookDB.getAllBooks()) {
+            bookListModel.addElement(book.toString());
+        }
+    }
+
+    private void showBookDetails(int bookIndex) {
+        Book book = bookDB.getAllBooks().get(bookIndex);
+
+        JTextArea detailsArea = new JTextArea(20, 50);
+        detailsArea.setText(book.getDetailedInfo());
+        detailsArea.setEditable(false);
+        detailsArea.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        JScrollPane scrollPane = new JScrollPane(detailsArea);
+
+        JPanel buttonPanel = new JPanel();
+        JButton addToCartBtn = new JButton("🛒 Add to Cart");
+        JButton buyNowBtn = new JButton("💰 Buy Now");
+
+        buttonPanel.add(addToCartBtn);
+        buttonPanel.add(buyNowBtn);
+
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        addToCartBtn.addActionListener(e -> {
+            addToCart(bookIndex);
+            ((JDialog)SwingUtilities.getWindowAncestor(mainPanel)).dispose();
+        });
+
+        buyNowBtn.addActionListener(e -> {
+            buyNow(bookIndex);
+            ((JDialog)SwingUtilities.getWindowAncestor(mainPanel)).dispose();
+        });
+
+        JOptionPane.showMessageDialog(mainFrame, mainPanel, "Book Details - " + book.getTitle(), JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void showAddBookDialog() {
+        JTextField titleField = new JTextField();
+        JTextField authorField = new JTextField();
+        JTextField genreField = new JTextField();
+        JTextField priceField = new JTextField();
+        JTextField isbnField = new JTextField();
+        JTextArea descriptionArea = new JTextArea(3, 30);
+
+        JPanel panel = new JPanel(new GridLayout(6, 2, 10, 10));
+        panel.add(new JLabel("Title:"));
+        panel.add(titleField);
+        panel.add(new JLabel("Author:"));
+        panel.add(authorField);
+        panel.add(new JLabel("Genre:"));
+        panel.add(genreField);
+        panel.add(new JLabel("Price:"));
+        panel.add(priceField);
+        panel.add(new JLabel("ISBN:"));
+        panel.add(isbnField);
+        panel.add(new JLabel("Description:"));
+        panel.add(new JScrollPane(descriptionArea));
+
+        int result = JOptionPane.showConfirmDialog(mainFrame, panel, "Add New Book",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                if (titleField.getText().isEmpty() || authorField.getText().isEmpty()) {
+                    JOptionPane.showMessageDialog(mainFrame, "Title and Author are required!");
+                    return;
+                }
+
+                Book book = new Book(
+                        titleField.getText(),
+                        authorField.getText(),
+                        genreField.getText(),
+                        Double.parseDouble(priceField.getText()),
+                        isbnField.getText()
+                );
+                bookDB.addBook(book);
+                JOptionPane.showMessageDialog(mainFrame, "Book added successfully!");
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(mainFrame, "Invalid price format!");
+            }
+        }
+    }
+
+    private void showInventory() {
+        StringBuilder inventory = new StringBuilder("📊 Current Inventory:\n\n");
+        for (Book book : bookDB.getAllBooks()) {
+            inventory.append(String.format("• %s by %s - $%.2f (%d in stock)\n",
+                    book.getTitle(), book.getAuthor(), book.getPrice(), book.getStock()));
+        }
+
+        JTextArea inventoryArea = new JTextArea(inventory.toString());
+        inventoryArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(inventoryArea);
+        scrollPane.setPreferredSize(new Dimension(600, 400));
+
+        JOptionPane.showMessageDialog(mainFrame, scrollPane, "Inventory", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void addToCart(int bookIndex) {
+        Book book = bookDB.getAllBooks().get(bookIndex);
+        // FIX: Added null check for currentUser
+        String username = (currentUser != null) ? currentUser.getUsername() : "guest";
+
+        userCart.putIfAbsent(username, new ArrayList<>());
+        userCart.get(username).add(book);
+
+        JOptionPane.showMessageDialog(mainFrame,
+                "Added to cart: " + book.getTitle() + "\nPrice: $" + book.getPrice());
+    }
+
+    private void buyNow(int bookIndex) {
+        Book book = bookDB.getAllBooks().get(bookIndex);
+        int result = JOptionPane.showConfirmDialog(mainFrame,
+                "Buy '" + book.getTitle() + "' for $" + book.getPrice() + "?",
+                "Confirm Purchase", JOptionPane.YES_NO_OPTION);
+
+        if (result == JOptionPane.YES_OPTION) {
+            JOptionPane.showMessageDialog(mainFrame,
+                    "Purchase successful!\n\n" +
+                            "Book: " + book.getTitle() + "\n" +
+                            "Author: " + book.getAuthor() + "\n" +
+                            "Price: $" + book.getPrice() + "\n\n" +
+                            "Thank you for your purchase!");
+        }
+    }
+
+    private void updateCartDisplay(DefaultListModel<String> cartModel) {
+        cartModel.clear();
+        // FIX: Added null check for currentUser
+        String username = (currentUser != null) ? currentUser.getUsername() : "guest";
+        List<Book> cart = userCart.getOrDefault(username, new ArrayList<>());
+
+        double total = 0;
+        for (Book book : cart) {
+            cartModel.addElement(book.getTitle() + " - $" + book.getPrice());
+            total += book.getPrice();
+        }
+
+        if (cartModel.isEmpty()) {
+            cartModel.addElement("Your cart is empty");
+        } else {
+            cartModel.addElement("======================");
+            cartModel.addElement("Total: $" + String.format("%.2f", total));
+        }
+    }
+
+    private void removeFromCart(JList<String> cartList, DefaultListModel<String> cartModel) {
+        int selectedIndex = cartList.getSelectedIndex();
+        // FIX: Added null check for currentUser
+        String username = (currentUser != null) ? currentUser.getUsername() : "guest";
+        List<Book> cart = userCart.get(username);
+
+        if (selectedIndex != -1 && cart != null && selectedIndex < cart.size()) {
+            Book removedBook = cart.remove(selectedIndex);
+            JOptionPane.showMessageDialog(mainFrame, "Removed: " + removedBook.getTitle());
+            updateCartDisplay(cartModel);
+        } else {
+            JOptionPane.showMessageDialog(mainFrame, "Please select an item to remove!");
+        }
+    }
+
+    private void checkout(DefaultListModel<String> cartModel) {
+        // FIX: Added null check for currentUser
+        String username = (currentUser != null) ? currentUser.getUsername() : "guest";
+        List<Book> cart = userCart.getOrDefault(username, new ArrayList<>());
+
+        if (cart.isEmpty()) {
+            JOptionPane.showMessageDialog(mainFrame, "Your cart is empty!");
+            return;
+        }
+
+        double total = cart.stream().mapToDouble(Book::getPrice).sum();
+
+        int result = JOptionPane.showConfirmDialog(mainFrame,
+                "Confirm checkout?\n\nTotal: $" + String.format("%.2f", total) + "\nItems: " + cart.size(),
+                "Checkout", JOptionPane.YES_NO_OPTION);
+
+        if (result == JOptionPane.YES_OPTION) {
+            JOptionPane.showMessageDialog(mainFrame,
+                    "Order placed successfully!\n\n" +
+                            "Total: $" + String.format("%.2f", total) + "\n" +
+                            "Items: " + cart.size() + "\n" +
+                            "Thank you for your order!");
+
+            userCart.remove(username);
+            updateCartDisplay(cartModel);
+        }
+    }
+
+    private void clearCart(DefaultListModel<String> cartModel) {
+        // FIX: Added null check for currentUser
+        String username = (currentUser != null) ? currentUser.getUsername() : "guest";
+        userCart.remove(username);
+        updateCartDisplay(cartModel);
+        JOptionPane.showMessageDialog(mainFrame, "Cart cleared!");
+    }
+
+    public static void main(String[] args) {
+        // Set system look and feel
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        SwingUtilities.invokeLater(() -> {
+            new OnlineBookPortal();
+        });
+    }
+}
